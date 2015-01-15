@@ -2,7 +2,10 @@
 
 So, you have bought a cheap scanner and you want to get professional-quality scans out of it?
 Here are some walk-through guides for the best workflows I have achieved.
-All these workflows use either ScanGear, the scan software that comes with your scanner, or open source / free software easily obtainable from the internet.
+All these workflows use either ScanGear, the scan software that comes with your scanner, or open source / free software easily obtainable from the internet. 
+The only exception is Photoshop, that I have assumed everyone dealing with photos uses. 
+But no advanced photoshop functionality has been used here, so go ahead and try the same methods on Gimp.
+It should work.
 
 By the way all these methods, except those who rely on Sane open source drivers, should be applicable to the other consumer-level scanners currently in production.
 Unfortunately there are no working Sane drivers for the excellent Nikon scanners and the ubiquitous Epson scanners.
@@ -12,6 +15,6 @@ I will be gradually publishing my findings as I play with this cheap and versati
 
 The list of walkthroughs (under construction):
 
-1. ["ScanGear + Photoshop"](./sg_ps.md)
+1. [ScanGear + Photoshop](./sg_ps.md)
 2. ScanGear(RAW) + NegFix8
 3. Sane + NegFix8
