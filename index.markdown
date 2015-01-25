@@ -3,6 +3,8 @@ layout: default
 title: Neg Scanner's Guide to CanoScan 9000f Mark II
 ---
 
+# Neg Scanner's Guide to CanoScan 9000f Mark II
+
 So, you have bought a cheap scanner and you want to get professional-quality scans out of it?
 Here are some walk-through guides for the best workflows I have achieved.
 All these workflows use either ScanGear, the scan software that comes with your scanner, or open source / free software easily obtainable from the internet. 
