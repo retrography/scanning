@@ -1,0 +1,28 @@
+# Dependencies
+markdown:            redcarpet
+highlighter:         pygments
+redcarpet:
+    extensions: ["no_intra_emphasis", "fenced_code_blocks", "autolink", "tables", "with_toc_data"]
+
+# Permalinks
+#
+# Use of `relative_permalinks` ensures post links from the index work properly.
+permalink:           pretty
+relative_permalinks: true
+
+# Setup
+title:               "Neg Scanner's"
+tagline:             'guide to the galaxy'
+description:         'This is the place where I gather resources, guides and code,  useful for quality negative scanning.'
+baseurl:             '/scanning'
+url:                 'http://retrography.github.com/scanning'
+paginate:            5
+
+# About/contact
+author:
+  name:              'Mahmood Shafeie Zargar'
+  url:               'https://twitter.com/mszargar'
+  email:             'mahmood@gmail.com'
+
+# Custom vars
+version:             1.0.0
