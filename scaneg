@@ -1,0 +1,226 @@
+#!/bin/bash
+
+# All defaults here
+
+resolution='4800'
+format='tiff'
+mode='color'
+filmtype='120'
+infrared=false
+scale='3'
+
+basename="$(date +%Y-%m-%d_%H%M%S)"
+
+#set -x  # This turns debug mode on
+
+# Read options from command prompt
+
+while getopts "m:r:f:o:t:s:l:i" arg; do
+    case $arg in
+        m)
+        case "$OPTARG" in
+            color|gray)
+                mode=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid color mode."
+                exit 1
+                ;;
+        esac
+        ;;
+        r)
+        case "$OPTARG" in
+            1200|2400|4800)
+                resolution=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid resolution."
+                exit 1
+                ;;
+        esac
+        ;;
+        f)
+        case "$OPTARG" in
+            tiff)
+                format=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid file format."
+                exit 1
+                ;;
+        esac
+        ;;
+        o)
+        basename=$OPTARG
+        ;;
+        t)
+        case "$OPTARG" in
+            120)
+                filmtype=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid film type."
+                exit 1
+                ;;
+        esac
+        ;;
+        s)
+        case "$OPTARG" in
+            1|2|3|5|10)
+                scale=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid scale factor."
+                exit 1
+                ;;
+        esac
+        ;;
+		l)
+        y=$OPTARG
+		;;
+        i)
+        infrared=true
+        ;;
+    esac
+done
+
+op_mode=$mode
+
+case "$filmtype" in
+    120)
+        # Parameters for medium format scan window
+        l='80.6' # x offset
+        t='25.8' # y offset
+        x='56.2'
+        if [[ -z "$y" ]]; then 
+			y='219.2'
+		fi
+        ;;
+    135)
+        echo "Usage: Invalid film type."
+        exit 1
+        ;;
+esac
+
+function scan {
+
+    echo "Scanning $op_mode..."
+
+    scanimage --device-name pixma:04A9190D \
+    --source 'Transparency Unit' \
+    --resolution "$resolution" \
+    --format "$format" \
+    --mode "$op_mode" \
+    -l "$l" -t "$t" -x "$x" -y "$y" \
+    1>"${basename}_${op_mode}.$format" 2>/dev/null
+
+}
+
+function resize {
+
+    echo "Resizing..."
+
+    mogrify -scale "$newsize"\! \
+        -compress zip \
+        "${basename}_${op_mode}.$format"
+
+}
+
+function scan_job {
+    scan
+
+    if [ "$op_mode" != "infrared" ]; then
+        width=$(identify -format "%w" "${basename}_${op_mode}.$format")
+        height=$(identify -format "%h" "${basename}_${op_mode}.$format")
+        newsize=$(expr $width / $scale)"x"$(expr $height / $scale)
+    fi
+
+    resize
+}
+
+scan_job
+
+if [ "$infrared" = true ]; then
+    op_mode='infrared'
+    l=$(echo "$l - 0.12" | bc)
+    x=$(echo "$x + 0.24" | bc)
+    scan_job
+
+    echo "Compositing..."
+
+    convert "${basename}_${mode}.$format" "${basename}_${op_mode}.$format" \
+        -compose copyopacity -composite -compress zip \
+        "${basename}_${mode}_combo.$format"
+	
+    rm -f "${basename}_${mode}.$format"
+    rm -f "${basename}_${op_mode}.$format"
+fi
+
+# Old resize function
+
+# To avoid "the PNG file specifies an offset" problem, use the +repage option.
+
+# convert "${basename}_${op_mode}.$format" \
+#     -crop "$strip" \
+#     -rotate 270 \
+#     -filter box -resize "$scale" \
+#     +repage \
+#     -compress zip \
+#     "${basename}_${op_mode}_${suffix}.$format"
+
+
+# Cut two strips from a 135 negative scan, or one strip from a 120 scan on CanoScan 9000F Mark II
+
+# function scan_job {
+#
+#     case "$filmtype" in
+#         135)
+#             # case "$resolution" in
+#             #     1200)
+#             #         strip='1250x10850+0+925'
+#             #         suffix='left'
+#             #         crop
+#             #         strip='1250x10850+1855+925'
+#             #         suffix='right'
+#             #         crop
+#             #         ;;
+#             #     2400)
+#             #         strip='2500x21700+0+1850'
+#             #         suffix='left'
+#             #         crop
+#             #         strip='2500x21700+3710+1850'
+#             #         suffix='right'
+#             #         crop
+#             #         ;;
+#             #     4800)
+#             #         strip='5000x43400+0+3700'
+#             #         suffix='left'
+#             #         crop
+#             #         strip='5000x43400+7420+3700'
+#             #         suffix='right'
+#             #         crop
+#             #         ;;
+#             #     *)
+#             #         echo "Usage: Invalid resolution."
+#             #         exit 1
+#             #         ;;
+#             # esac
+#             echo "135 not implemented yet"
+#             ;;
+#         120)
+#             scan
+#             resize
+#             ;;
+#         *)
+#             echo "Usage: Invalid film type."
+#             exit 1
+#             ;;
+#     esac
+#
+# }
+
+
+# convert "P_${basename}_${imode}_a.$format" "${basename}_${mode}_a.$format" \
+#     -compose copyopacity -composite -compress zip "combo_${basename}_a.$format"
+# convert "P_${basename}_${imode}_b.$format" "${basename}_${mode}_b.$format" \
+#     -compose copyopacity -composite -compress zip "combo_${basename}_b.$format"
