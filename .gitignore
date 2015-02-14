@@ -1,5 +1,2 @@
-_site/
-.sass-cache/
 .DS_Store
-_*
-._*
+_notes.txt
