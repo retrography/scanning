@@ -1,0 +1,42 @@
+Canoscan 9000f mkII
+
+The entire width of the scanning area: 216.069
+The width of the transparency scanning area: 80.306
+
+mid of the scan area 108.0345 mm
+
+crop for 120: 2660x10320+215+1155'
+
+-l 76
+-x 66
+
+final size: 2660 × 10320 pixels = 56.3 x 218.44 mm
+
+1 inch = 25.4 millimeters
+
+
+ideal x: 56.3 mm
+
+ideal y: 218.44 mm
+
+ideal l: 108.0345 - 56.43 / 2 = 79.8195 mm ~ 79.82mm
+
+ideal l corrected: 79.8195 + 0.762 (correction) = 80.5815 mm ~ 80.58 make it 80.6 (diff = 0.02)
+
+x corrected: 56.3 - (5/1200*25.4) = 56.1942 ~ 56.2
+
+
+
+y offset (t) on the scans: 1170 pix = 1170/1200*25.4 = 24.765 mm ~ 24.8
+
+some correction: 40 pix : (40/1200*25.4) + 24.765 = 25.6116 ~ 25.61 make it 25.8 (diff = 0.19)
+
+ideal y expanded: 220
+
+correction -20pix: 220-(20/1200*25.4) = 219.5766 ~ 219.57 // - diff = 219.57-0.19 = 219.38 make it 219.2 (diff=18)
+
+final (for 120):
+scanimage --device-name pixma:04A9190D --source 'Transparency Unit' --resolution 1200 --format tiff --mode color -l 80.6 -t 25.8 -x 56.2 -y 219.2 > manscano.tiff
+
+infrared width difference: smaller by 6 pixels on each side for a 120 neg => 6/1200*24.5= 0.1225 mm ~ 0.12
+
