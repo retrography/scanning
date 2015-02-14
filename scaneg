@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# ToDos:
+# 135 film
+# auto trim (white space)
+# auto cut (based on shot size provided by user in a conf file?)
+# GUI
+# keep all intermediary files
+# use negfix8 to invert
+# transform the alpha channel into b&w within the software
+# correct the minimal discrepancy between image and infrared
+
 # All defaults here
 
 resolution='4800'
@@ -8,6 +18,7 @@ mode='color'
 filmtype='120'
 infrared=false
 scale='3'
+frames='1'
 
 basename="$(date +%Y-%m-%d_%H%M%S)"
 
@@ -15,7 +26,7 @@ basename="$(date +%Y-%m-%d_%H%M%S)"
 
 # Read options from command prompt
 
-while getopts "m:r:f:o:t:s:l:i" arg; do
+while getopts "m:r:f:o:t:c:l:i" arg; do
     case $arg in
         m)
         case "$OPTARG" in
@@ -30,9 +41,18 @@ while getopts "m:r:f:o:t:s:l:i" arg; do
         ;;
         r)
         case "$OPTARG" in
-            1200|2400|4800)
-                resolution=$OPTARG
-                ;;
+            600)
+            	resolution='1200'
+				scale='2'
+            	;;
+			1200)
+				resolution='2400'
+				scale='2'
+				;;
+			1600)
+				resolution='4800'
+				scale='3'
+				;;
             *)
                 echo "Usage: Invalid resolution."
                 exit 1
@@ -64,20 +84,20 @@ while getopts "m:r:f:o:t:s:l:i" arg; do
                 ;;
         esac
         ;;
-        s)
+		l)
+        y=$OPTARG
+		;;
+		c)
         case "$OPTARG" in
-            1|2|3|5|10)
-                scale=$OPTARG
+            1|2|3)
+                frames=$OPTARG
                 ;;
             *)
-                echo "Usage: Invalid scale factor."
+                echo "Usage: Invalid frame count."
                 exit 1
                 ;;
         esac
         ;;
-		l)
-        y=$OPTARG
-		;;
         i)
         infrared=true
         ;;
@@ -95,9 +115,12 @@ case "$filmtype" in
         if [[ -z "$y" ]]; then 
 			y='219.2'
 		fi
+		# For now assumes all 120 shots are 6x6 
+		ratio='1'
         ;;
     135)
         echo "Usage: Invalid film type."
+		ratio='1.5'
         exit 1
         ;;
 esac
@@ -138,23 +161,56 @@ function scan_job {
     resize
 }
 
+function shot_cut {
+	
+    #fin_width=$(identify -format "%w" "$final.$format")
+    #fin_height=$(identify -format "%h" "$final.$format")
+	#spacing=$(( final_height / frames - final_width * ratio ))
+	#frm_size=$(( fin_width * ratio ))
+	#cut_height=$(( fin_height / frames ))
+	#cut_size=$fin_width\x$cut_height
+		
+    case "$frames" in
+        1)
+		;;
+		2|3)
+		echo "Cropping frames..."
+		convert "$final.$format" \
+			-crop "1x$frames@" \
+			"${final}_%d.$format" \
+			&& rm "$final.$format"
+        ;;
+        *)
+        echo "Usage: Invalid frame count."
+        exit 1
+        ;;
+    esac
+}
+
 scan_job
 
 if [ "$infrared" = true ]; then
     op_mode='infrared'
-    l=$(echo "$l - 0.12" | bc)
-    x=$(echo "$x + 0.24" | bc)
+    l=$(echo "$l - 0.17" | bc)
+    x=$(echo "$x + 0.34" | bc)
+	t=$(echo "$t + 0.08" | bc)
     scan_job
 
     echo "Compositing..."
 
     convert "${basename}_${mode}.$format" "${basename}_${op_mode}.$format" \
         -compose copyopacity -composite -compress zip \
-        "${basename}_${mode}_combo.$format"
-	
-    rm -f "${basename}_${mode}.$format"
-    rm -f "${basename}_${op_mode}.$format"
+        "${basename}_${mode}_ir.$format" \
+		&& rm -f "${basename}_${mode}.$format" "${basename}_${op_mode}.$format"
+
+	final="${basename}_${mode}_ir"
+else
+	final="${basename}_${mode}"
 fi
+
+shot_cut
+
+echo "Done."
 
 # Old resize function
 
