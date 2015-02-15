@@ -177,6 +177,8 @@ function shot_cut {
 		echo "Cropping frames..."
 		convert "$final.$format" \
 			-crop "1x$frames@" \
+			-scene 1 \
+			-compress zip \
 			"${final}_%d.$format" \
 			&& rm "$final.$format"
         ;;
