@@ -135,7 +135,7 @@ function scan {
     --format "$format" \
     --mode "$op_mode" \
     -l "$l" -t "$t" -x "$x" -y "$y" \
-    1>"${basename}_${op_mode}.$format" 2>/dev/null
+    1>"${basename}_${op_mode}.$format" 2>/dev/null | true
 
 }
 
