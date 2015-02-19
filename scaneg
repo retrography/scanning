@@ -22,7 +22,7 @@ frames='1'
 
 basename="$(date +%Y-%m-%d_%H%M%S)"
 
-#set -x  # This turns debug mode on
+set -x  # This turns debug mode on
 
 # Read options from command prompt
 
@@ -75,7 +75,7 @@ while getopts "m:r:f:o:t:c:l:i" arg; do
         ;;
         t)
         case "$OPTARG" in
-            120)
+            120|135)
                 filmtype=$OPTARG
                 ;;
             *)
@@ -89,7 +89,7 @@ while getopts "m:r:f:o:t:c:l:i" arg; do
 		;;
 		c)
         case "$OPTARG" in
-            1|2|3)
+            1|2|3|4|5|6)
                 frames=$OPTARG
                 ;;
             *)
@@ -112,16 +112,18 @@ case "$filmtype" in
         l='80.6' # x offset
         t='25.8' # y offset
         x='56.2'
-        if [[ -z "$y" ]]; then 
-			y='219.2'
-		fi
+        test -z "$y" && y='219.2'
 		# For now assumes all 120 shots are 6x6 
 		ratio='1'
         ;;
     135)
-        echo "Usage: Invalid film type."
+	    # Parameters for medium format scan window
+        l='77' # x offset
+        t='21.75' # y offset
+        x='63.06'
+        test -z "$y" && y='226'
+		# For now assumes all 135 shots are 24x36 
 		ratio='1.5'
-        exit 1
         ;;
 esac
 
@@ -140,6 +142,11 @@ function scan {
 }
 
 function resize {
+
+# Here we need a condition that checks whether we are in the first run
+# of a two-run scan (normally color or gray plus infrared) and if it is
+# the case, run the resize command in the background. But then the structure
+# of the script will have to be adapted (can't be linear like this).
 
     echo "Resizing..."
 
@@ -169,14 +176,31 @@ function shot_cut {
 	#frm_size=$(( fin_width * ratio ))
 	#cut_height=$(( fin_height / frames ))
 	#cut_size=$fin_width\x$cut_height
+
+	case "$filmtype" in
+	    135)
+		echo "Cropping film stripes..."
+		convert \( "$final.$format" \
+			-gravity West -crop 37.5%x100%\! \) \
+			\( "$final.$format" \
+			-gravity East -crop 37.5%x100%\! \) \
+			-compress zip \
+			"$final.$format"
+			
+		overlap=$(( width * 375 / 10000 )) # width * 37.5% / 10
+		;;
+		120)
+		overlap=$(( width / 15 ))
+		;;
+	esac
 		
     case "$frames" in
         1)
 		;;
-		2|3)
+		2|3|4|5|6)
 		echo "Cropping frames..."
 		convert "$final.$format" \
-			-crop "1x$frames@" \
+			-crop "1x$frames+0+$overlap@" \
 			-scene 1 \
 			-compress zip \
 			"${final}_%d.$format" \
