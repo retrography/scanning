@@ -22,7 +22,7 @@ frames='1'
 
 basename="$(date +%Y-%m-%d_%H%M%S)"
 
-set -x  # This turns debug mode on
+# set -x  # This turns debug mode on
 
 # Read options from command prompt
 
@@ -137,7 +137,7 @@ function scan {
     --format "$format" \
     --mode "$op_mode" \
     -l "$l" -t "$t" -x "$x" -y "$y" \
-    1>"${basename}_${op_mode}.$format" 2>/dev/null | true
+    1>"${basename}_${op_mode}.$format" 2>/dev/null |:
 
 }
 
@@ -190,7 +190,8 @@ function shot_cut {
 		overlap=$(( width * 375 / 10000 )) # width * 37.5% / 10
 		;;
 		120)
-		overlap=$(( width / 15 ))
+		#overlap=$(( width / 15 ))
+		overlap="0"
 		;;
 	esac
 		
