@@ -117,7 +117,7 @@ case "$filmtype" in
 		ratio='1'
         ;;
     135)
-	    # Parameters for medium format scan window
+	    # Parameters for 35mm scan window
         l='77' # x offset
         t='21.75' # y offset
         x='63.06'
