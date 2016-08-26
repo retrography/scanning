@@ -22,7 +22,7 @@ First we have to make sure the configuration is correct.
 
 ![04scnmd]({{ site.baseurl }}/public/images/04scnmd.png)
 
-5) Now select the whole strip of film you intend to scan. Do your best not to exclude the negative holder. Now press the histogram button.
+5) Now select the whole strip of film you intend to scan. Do your best not to include the negative holder. Now press the histogram button.
 
 ![05slcpre]({{ site.baseurl }}/public/images/05slcpre.png)
 
