@@ -1,0 +1,3 @@
+#!/bin/bash
+
+scaneg -i -c3 -l180
