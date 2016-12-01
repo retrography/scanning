@@ -17,7 +17,7 @@ format='tiff'
 mode='color'
 filmtype='120'
 infrared=false
-scale='3'
+scale='1'
 frames='1'
 
 basename="$(date +%Y-%m-%d_%H%M%S)"
@@ -165,7 +165,7 @@ function scan_job {
         newsize=$(expr $width / $scale)"x"$(expr $height / $scale)
     fi
 
-    resize
+#    resize
 }
 
 function shot_cut {

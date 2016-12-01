@@ -8,157 +8,147 @@ import math
 gi.require_version('Vips', '8.0')
 from gi.repository import Vips
 
-# Negfix profiler
-# LUT not implemented yet
+#TODO: Test BW
+#TODO: Negfix profiler not implemeted yet
+#TODO: IR separation not implemented yet
+#TODO: Resize not implemented yet
+#TODO: Frame cut not implemented yet
+#TODO: Dust removal not implemented yet
+
 
 def profile(im):
     temp = im.extract_area(10, 10, im.width - 20, im.height - 20).gaussblur(3, min_ampl=0.5)
 
-    minimar = temp[0].min()
-    minimag = temp[1].min()
-    minimab = temp[2].min()
-    maximar = temp[0].max()
-    maximag = temp[1].max()
-    maximab = temp[2].max()
+    mins = [None] * nobands
+    maxs = [None] * nobands
+    minvals = [1] * nobands
+    maxvals = [0] * nobands
+    result = [None] * nobands
 
-    values = [1, 1, 1, 0, 0, 0]
+    for b in range(0, nobands):
+        mins[b] = temp[b].min()
+        maxs[b] = temp[b].max()
+        minvals[b] = min((mins[b] if mins[b] > 0 else minvals[b]), minvals[b])
+        maxvals[b] = max((maxs[b] if maxs[b] < 1 else maxvals[b]), maxvals[b])
+        result[b] = math.log10(maxvals[b] / minvals[b]) / math.log10(maxvals[0] / minvals[0])
 
-    values = [min((minimar if minimar > 0 else values[0]), values[0]),
-              min((minimag if minimag > 0 else values[1]), values[1]),
-              min((minimab if minimab > 0 else values[2]), values[2]),
-              max((maximar if maximar < 1 else values[3]), values[3]),
-              max((maximag if maximag < 1 else values[4]), values[4]),
-              max((maximab if maximab < 1 else values[5]), values[5])]
-
-    return [values[0], values[1], values[2],
-            pow((values[0] / values[3]), (1 / gamma)) * qrange * 0.95,
-            math.log10(values[4] / values[1]) / math.log10(values[3] / values[0]),
-            math.log10(values[5] / values[2]) / math.log10(values[3] / values[0])]
+    return minvals + result + [pow((minvals[0] / maxvals[0]), (1 / gamma)) * qrange * 0.95]
 
 
-# Negfix inverter
-# B&W not implemented yet
-# LUT not implemented yet
+def invert(im):
 
-def invert(im, prof):
+#TODO: LUT not implemented yet
 
-# When implementing B&W
-#    if im.bands >= 3:
-#        r = transform(im[0])
-#        g = transform(im[1])
-#        b = transform(im[2])
-#        return r.bandjoin([g, b])
-#    else:
-#        return transform(im[0])
+    bands = [None] * nobands
+    for b in range(0, nobands):
+        bands[b] = (prof[b] / im[b]).gamma(exponent=prof[b + nobands])
 
-    r = im[0]
-    g = im[1]
-    b = im[2]
-    
-    r = (prof[0] / r)
-    g = (prof[1] / g).gamma(exponent = prof[4])
-    b = (prof[2] / b).gamma(exponent = prof[5])
-    
-    im = (r.bandjoin([g, b]))
-    
-    im = im.gamma(exponent = gamma)
-    im = im * (qrange + 1) - prof[3]
+    im = bands[0]
+    if nobands > 1:
+        im = im.bandjoin(bands[1:nobands])
+
+    im = im.gamma(exponent=gamma)
+    im = im * (qrange + 1) - prof[nobands * 2]
 
     return im.cast(bandfmt)
 
-# drlim function
 
-def shadows(band, lim):
-    mask = (band <= lim).cast(band.BandFmt, shift = True)
-    lut = (band & mask).identity(ushort = True)
-    lut = (65535 * (lut / lim * 0.1))
-    return band.maplut(lut) & mask
+# Shadow / Highlight Recovery
+def shrecovery(im):
 
-# drlim function
+    def shadows(band, lim):
+        mask = (band <= lim).cast(band.BandFmt, shift=True)
+        lut = (band & mask).identity(ushort=True)
+        lut = (65535 * (lut / lim * 0.1))
+        return band.maplut(lut) & mask
 
-def highlights(band, lim):
-    mask = (band >= lim).cast(band.BandFmt, shift = True)
-    lut = (band & mask).identity(ushort = True)
-    lut = (65535 * ((lut - lim) / (65536 - lim) * 0.1 + 0.9))
-    return band.maplut(lut) & mask
-    
-# drlim function
+    def highlights(band, lim):
+        mask = (band >= lim).cast(band.BandFmt, shift=True)
+        lut = (band & mask).identity(ushort=True)
+        lut = (65535 * ((lut - lim) / (65536 - lim) * 0.1 + 0.9))
+        return band.maplut(lut) & mask
 
-def midtones(band, lims):
-    mask = ((band > lims[0]) & (band < lims[1])).cast(band.BandFmt, shift = True)
-    lut = (band & mask).identity(ushort = True)
-    lut = (lut - lims[0]) / (lims[1] - lims[0])
-    lut = (65535 * (lut * 0.8 + 0.1))
-    return band.maplut(lut) & mask  
+    def midtones(band, lims):
+        mask = ((band > lims[0]) & (band < lims[1])).cast(band.BandFmt, shift=True)
+        lut = (band & mask).identity(ushort=True)
+        lut = (lut - lims[0]) / (lims[1] - lims[0])
+        lut = (65535 * (lut * 0.8 + 0.1))
+        return band.maplut(lut) & mask
 
-# drlim function
+    bands = [None] * nobands
+    for b in range(0, nobands):
+        limits = (im[b].percent(1), im[b].percent(99))
+        lo = shadows(im[b], limits[0])
+        hi = highlights(im[b], limits[1])
+        mid = midtones(im[b], limits)
+        bands[b] = lo.add(mid).add(hi).cast(im[b].BandFmt)
 
-def drlim(band):
-    lims = (band.percent(1), band.percent(99))
-    lo = shadows(band, lims[0])
-    hi = highlights(band, lims[1])
-    mid = midtones(band, lims)
-    return lo.add(mid).add(hi).cast(band.BandFmt) 
+    im = bands[0]
+    if nobands > 1:
+        im = im.bandjoin(bands[1:nobands])
 
-# Dynamic Range Limit function
+    return im
 
-def drlim(im):
-    if im.bands >= 3:
-        r = drlim(im[0])
-        g = drlim(im[1])
-        b = drlim(im[2])
-        return r.bandjoin([g, b])
-    else:
-        band = im[0]
-        lims = (band.percent(1), band.percent(99))
-        lo = shadows(band, lims[0])
-        hi = highlights(band, lims[1])
-        mid = midtones(band, lims)
-        return lo.add(mid).add(hi).cast(band.BandFmt) 
 
 # Contrast Stretch
-
-def cs(im):
+def cstretch(im):
     # Image histogram
     h = im.cast(Vips.BandFormat.UCHAR, shift=True).hist_find()
     w = h.width
     mp = im.width * im.height
     threshold = mp * 0.001
-    lims = [[-1,-1],[-1,-1],[-1,-1]]
+    limits = [[-1, -1], [-1, -1], [-1, -1]]
     for p in range(w - 2):
         for b in range(h.bands):
-            if lims[b][0] == -1 and (h[b](p, 0)[0] > threshold) and (h[b](p + 1,0)[0] > threshold) and (h[b](p + 2,0)[0] > threshold):
-                lims[b][0] = p 
-            if lims[b][1] == -1 and (h[b](w - p - 1, 0)[0] > threshold) and (h[b](w - p - 2,0)[0] > threshold) and (h[b](w - p - 3,0)[0] > threshold):
-                lims[b][1] = (w - p - 1)
+            if limits[b][0] == -1 and (h[b](p, 0)[0] > threshold) and (h[b](p + 1, 0)[0] > threshold) and (h[b](p + 2, 0)[0] > threshold):
+                limits[b][0] = p
+            if limits[b][1] == -1 and (h[b](w - p - 1, 0)[0] > threshold) and (h[b](w - p - 2, 0)[0] > threshold) and (h[b](w - p - 3, 0)[0] > threshold):
+                limits[b][1] = (w - p - 1)
             
     bands = im.bandsplit()
     for band in range(h.bands):
         a = 0
-        b = pow(2,16) - 1
-        c = lims[band][0] 
-        d = lims[band][1]
+        b = pow(2, 16) - 1
+        c = limits[band][0]
+        d = limits[band][1]
         bands[band] = (im[band] - c * 256) * ((b - a)/(256 * (d - c))) + a
 
-    im = bands[0].bandjoin([bands[1], bands[2]])
+    im = bands[0]
+    if nobands > 1:
+        im = im.bandjoin(bands[1:nobands])
+
     return im.cast(bandfmt)
 
 infile = sys.argv[1]
-im = Vips.Image.new_from_file(infile)
+image = Vips.Image.new_from_file(infile)
 
-bandfmt = im.BandFmt
+resolution = int(image.xres * 25.4)
+
+if resolution == 4800:
+    image = image.shrink(3, 3)
+elif resolution in [1200, 2400]:
+    image = image.shrink(2, 2)
+
+if image.bands >= 3:
+    color = True
+    nobands = 3
+else:
+    color = False
+    nobands = 1
+
+bandfmt = image.BandFmt
 gamma = 2.15
-qrange = pow(2, im.Bbits) - 1
-im = im / qrange
+qrange = pow(2, image.Bbits) - 1
+image /= qrange
+prof = profile(image)
 
-prof = profile(im)
-im = invert(im, prof)
+image = invert(image)
 
-#TODO: create a cl option for drlim
-im = drlim(im)       
+#TODO: create a commandline option for shrecovery
+#image = shrecovery(image)
 
-#TODO: create a cl option for cs
-im = cs(im)
+#TODO: create a commandline option for cstretch
+#image = cstretch(image)
 
-im.write_to_file("p_"+infile)
+image.write_to_file("p_"+infile)
 
