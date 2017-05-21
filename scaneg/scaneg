@@ -1,0 +1,189 @@
+#!/bin/bash
+
+# ToDos:
+# 135 film
+# auto trim (white space)
+# auto cut (based on shot size provided by user in a conf file?)
+# GUI
+# keep all intermediary files
+# use negfix8 to invert
+# transform the alpha channel into b&w within the software
+# correct the minimal discrepancy between image and infrared
+
+# All defaults here
+
+resolution='4800'
+format='tiff'
+mode='color'
+filmtype='120'
+infrared=false
+scale='1'
+frames='1'
+
+basename="$(date +%Y-%m-%d_%H%M%S)"
+
+# set -x  # This turns debug mode on
+
+# Read options from command prompt
+
+echo "<><><><> Scaneg command prompt film scanner v0.1 <><><><>"
+
+while getopts "m:r:f:o:t:c:l:i" arg; do
+    case $arg in
+        m)
+        case "$OPTARG" in
+            color|gray)
+                mode=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid color mode."
+                exit 1
+                ;;
+        esac
+        ;;
+        r)
+        case "$OPTARG" in
+            l|lo|low)
+            	resolution='1200'
+				scale='2'
+            	;;
+			m|med|medium)
+				resolution='2400'
+				scale='2'
+				;;
+			h|hi|high)
+				resolution='4800'
+				scale='3'
+				;;
+            *)
+                echo "Usage: Invalid resolution."
+                exit 1
+                ;;
+        esac
+        ;;
+        f)
+        case "$OPTARG" in
+            tiff)
+                format=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid file format."
+                exit 1
+                ;;
+        esac
+        ;;
+        o)
+        basename=$OPTARG
+        ;;
+        t)
+        case "$OPTARG" in
+            120|135)
+                filmtype=$OPTARG
+                ;;
+            *)
+                echo "Usage: Invalid film type."
+                exit 1
+                ;;
+        esac
+        ;;
+		l)
+        y=$OPTARG
+		;;
+        i)
+        infrared=true
+        ;;
+    esac
+done
+
+op_mode=$mode
+
+case "$filmtype" in
+    120)
+        # Parameters for medium format scan window
+        l='80.6' # x offset
+        t='25.8' # y offset
+        x='56.2'
+		test -z "$y" && y='219.2'
+		if ! [ $(echo "$y <= 219.2 && $y > 0" | bc -l) ]
+		then
+			echo "Error: Invalid strip length '$y'. Resetting to maximum length (219.2)."
+			y='219.2'
+		fi
+        ;;
+    135)
+	    # Parameters for 35mm scan window
+        l='77' # x offset
+        t='21.75' # y offset
+        x='63.06'
+        test -z "$y" && y='226'
+		# For now assumes all 135 shots are 24x36 
+        echo "Error: 35mm scan not implemented yet."
+        exit 1
+        ;;
+esac
+
+function scan {
+    echo "Scanning $op_mode..."
+
+    scanimage --device-name pixma:04A9190D \
+    --source 'Transparency Unit' \
+    --resolution "$resolution" \
+    --format "$format" \
+    --mode "$op_mode" \
+    -l "$l" -t "$t" -x "$x" -y "$y" \
+    1>"${basename}_${op_mode}.$format" #2>/dev/null |:
+
+}
+
+function resize {
+
+    echo "Resizing..."
+	
+	width=$(vipsheader -f Xsize "${basename}_${op_mode}.$format")
+	height=$(vipsheader -f Ysize "${basename}_${op_mode}.$format")
+	
+	if [ "$op_mode" = "infrared" ]; then
+		hscale=$(echo "$width / $newwidth" | bc -l)
+		vscale=$(echo "$height / $newheight" | bc -l)
+		
+		mv "${basename}_${op_mode}.$format" "${basename}_${op_mode}_large.$format"
+		vips shrink "${basename}_${op_mode}_large.$format" "${basename}_${op_mode}.$format" "$hscale" "$vscale" \
+			&& rm -f "${basename}_${op_mode}_large.$format"
+	else		
+		mv "${basename}_${op_mode}.$format" "${basename}_${op_mode}_large.$format"
+		vips shrink "${basename}_${op_mode}_large.$format" "${basename}_${op_mode}.$format" "$scale" "$scale" \
+			&& rm -f "${basename}_${op_mode}_large.$format"
+
+		newwidth=$(vipsheader -f Xsize "${basename}_${op_mode}.$format")
+		newheight=$(vipsheader -f Ysize "${basename}_${op_mode}.$format")
+	fi
+}
+
+function scan_job {
+    scan
+    resize
+}
+
+# Scan the photo
+scan_job
+
+# Scan the infrared and add the infrared band if needed
+if [ "$infrared" = true ]; then
+    op_mode='infrared'
+    l=$(echo "$l - 0.17" | bc -l)
+    x=$(echo "$x + 0.34" | bc -l)
+	t=$(echo "$t + 0.08" | bc -l)
+    scan_job
+
+    echo "Compositing..."
+
+    vips bandjoin "${basename}_${mode}.$format ${basename}_${op_mode}.$format" "${basename}_${mode}_ir.$format" \
+		&& rm -f "${basename}_${mode}.$format" "${basename}_${op_mode}.$format"
+
+	final="${basename}_${mode}_ir.$format"
+else
+	final="${basename}_${mode}.$format"
+fi
+
+echo "Done scanning. The results have been saved in '$final'."
+

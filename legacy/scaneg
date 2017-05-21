@@ -128,7 +128,6 @@ case "$filmtype" in
 esac
 
 function scan {
-
     echo "Scanning $op_mode..."
 
     scanimage --device-name pixma:04A9190D \
@@ -161,11 +160,14 @@ function scan_job {
 
     if [ "$op_mode" != "infrared" ]; then
         width=$(identify -format "%w" "${basename}_${op_mode}.$format")
+		#echo $width
         height=$(identify -format "%h" "${basename}_${op_mode}.$format")
+		#echo $height
         newsize=$(expr $width / $scale)"x"$(expr $height / $scale)
+		#echo $newsize
     fi
 
-#    resize
+    resize
 }
 
 function shot_cut {
@@ -235,7 +237,7 @@ else
 	final="${basename}_${mode}"
 fi
 
-shot_cut
+#shot_cut
 
 echo "Done."
 
